@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { BridgeAPI } from '../services/api';
-import { AuctionPanel } from './AuctionPanel';
 import { PlayArea } from './PlayArea';
 import { Hand } from './Hand';
 import type { GameState, Card } from '../types/game';
@@ -184,15 +183,15 @@ const ResponsiveLayout = styled.div<{ $displaySize: 'small' | 'medium' | 'large'
   grid-template-columns: ${({ $displaySize }) => {
     switch ($displaySize) {
       case 'small':   // ~19インチ以下 - コンパクト
-        return 'clamp(240px, 20vw, 350px) 1fr clamp(240px, 20vw, 350px)';
+        return 'clamp(180px, 15vw, 250px) 1fr clamp(180px, 15vw, 250px)';
       case 'medium':  // ~24インチ程度 - 標準
-        return 'clamp(280px, 25vw, 450px) 1fr clamp(280px, 25vw, 450px)';
+        return 'clamp(200px, 18vw, 300px) 1fr clamp(200px, 18vw, 300px)';
       case 'large':   // ~29インチ程度 - 大画面
-        return 'clamp(350px, 30vw, 550px) 1fr clamp(350px, 30vw, 550px)';
+        return 'clamp(220px, 20vw, 350px) 1fr clamp(220px, 20vw, 350px)';
       case 'xlarge':  // 30インチ以上 - 超大画面
-        return 'clamp(400px, 35vw, 650px) 1fr clamp(400px, 35vw, 650px)';
+        return 'clamp(250px, 22vw, 400px) 1fr clamp(250px, 22vw, 400px)';
       default:
-        return 'clamp(280px, 25vw, 450px) 1fr clamp(280px, 25vw, 450px)';
+        return 'clamp(200px, 18vw, 300px) 1fr clamp(200px, 18vw, 300px)';
     }
   }};
   
@@ -207,7 +206,7 @@ const Drawer = styled.div<{ open: boolean; side: 'left' | 'right' }>`
   top: 0;
   ${({ side }) => side === 'left' ? 'left: 0;' : 'right: 0;'}
   width: 85vw;
-  max-width: 35vw;
+  max-width: 300px;
   height: 100vh;
   background: #fff;
   box-shadow: 0 2px 16px rgba(0,0,0,0.18);
@@ -521,16 +520,113 @@ export const BridgeGame: React.FC = () => {
         
         {/* 左側ログパネル */}
         <Drawer open={logOpen} side="left">
-          <h3>Game Log</h3>
-          <div>
-            <p>Phase: {gameState.game_phase}</p>
-            <p>Current Player: {gameState.current_bidder || 'N/A'}</p>
-            {gameState.auction_history && gameState.auction_history.length > 0 && (
-              <div>
-                <h4>Auction History:</h4>
-                {gameState.auction_history.slice(-5).map((bid, i) => (
-                  <div key={i}>{bid.player}: {bid.type === 'bid' ? `${bid.level}${bid.suit}` : bid.type}</div>
+          <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
+            Game Log
+          </h3>
+          
+          {/* ラウンド進行 */}
+          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Round Progress</h4>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2196f3' }}>
+              {gameState.current_round} / {gameState.max_rounds}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+              {gameState.max_rounds - gameState.current_round} rounds remaining
+            </div>
+          </div>
+
+          {/* チーム総合点 */}
+          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Team Scores</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4caf50' }}>
+                  NS: {gameState.total_scores?.NS ?? 0}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666' }}>North-South</div>
+              </div>
+              <div style={{ fontSize: '20px', color: '#ccc' }}>vs</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#f44336' }}>
+                  EW: {gameState.total_scores?.EW ?? 0}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666' }}>East-West</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 現在のトリック数 */}
+          {gameState.game_phase === 'play' && (
+            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Current Hand</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>NS Tricks: {gameState.tricks_won?.NS ?? 0}</div>
+                  <div style={{ fontWeight: 'bold' }}>EW Tricks: {gameState.tricks_won?.EW ?? 0}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666' }}>Total: {(gameState.tricks_won?.NS ?? 0) + (gameState.tricks_won?.EW ?? 0)}/13</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 現在のコントラクト */}
+          {gameState.contract && (
+            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Contract</h4>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2196f3' }}>
+                {gameState.contract.level}{gameState.contract.suit}
+                {gameState.doubled === 1 && ' X'}
+                {gameState.doubled === 2 && ' XX'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                Declarer: {gameState.declarer}
+              </div>
+            </div>
+          )}
+          
+          {/* オークション履歴 */}
+          {gameState.auction_history && gameState.auction_history.length > 0 && (
+            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Recent Auction</h4>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '12px' }}>
+                {gameState.auction_history.slice(-8).map((bid, i) => (
+                  <div key={i} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    padding: '2px 0',
+                    borderBottom: i < gameState.auction_history.slice(-8).length - 1 ? '1px solid #eee' : 'none'
+                  }}>
+                    <span style={{ fontWeight: 'bold', color: '#2196f3' }}>{bid.player}:</span>
+                    <span style={{ color: bid.type === 'bid' ? '#4caf50' : '#666' }}>
+                      {bid.type === 'bid' ? `${bid.level}${bid.suit}` : bid.type.toUpperCase()}
+                    </span>
+                  </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* 現在のフェーズ情報 */}
+          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Current Phase</h4>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#2196f3', marginBottom: '4px' }}>
+              {(gameState.game_phase || '').replace('_', ' ').toUpperCase()}
+            </div>
+            {gameState.game_phase === 'auction' && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Current bidder: {gameState.current_bidder}
+              </div>
+            )}
+            {gameState.game_phase === 'play' && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Current player: {getCurrentPlayer()}
+              </div>
+            )}
+            {gameState.dealer && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Dealer: {gameState.dealer}
               </div>
             )}
           </div>
@@ -581,37 +677,313 @@ export const BridgeGame: React.FC = () => {
         
         {/* 右側操作パネル */}
         <Drawer open={ctrlOpen} side="right">
-          <h3>Controls</h3>
+          <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
+            Controls
+          </h3>
+          
           {gameState.game_phase === 'auction' && (
-            <AuctionPanel
-              auctionHistory={gameState.auction_history}
-              currentBidder={gameState.current_bidder}
-              onBid={handleBid}
-              onPass={handlePass}
-              onDouble={handleDouble}
-              onRedouble={handleRedouble}
-              canDouble={canDouble()}
-              canRedouble={canRedouble()}
-              isPlayerTurn={isPlayerTurn()}
-            />
+            <div>
+              <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Auction Controls</h4>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Your turn: {isPlayerTurn() ? 'YES' : 'NO'}
+                </div>
+                
+                {isPlayerTurn() && (
+                  <div>
+                    {/* レベル選択 */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Level:</div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {[1, 2, 3, 4, 5, 6, 7].map(level => (
+                          <button
+                            key={level}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              background: '#fff',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: '#333'
+                            }}
+                            onClick={() => {
+                              // レベルを選択状態にする（実装は後で）
+                            }}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* スート選択 */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Suit:</div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {[
+                          { suit: 'C', symbol: '♣', color: '#000' },
+                          { suit: 'D', symbol: '♦', color: '#d32f2f' },
+                          { suit: 'H', symbol: '♥', color: '#d32f2f' },
+                          { suit: 'S', symbol: '♠', color: '#000' },
+                          { suit: 'NT', symbol: 'NT', color: '#2196f3' }
+                        ].map(({ suit, symbol, color }) => (
+                          <button
+                            key={suit}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              background: '#fff',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: color
+                            }}
+                            onClick={() => {
+                              // スートを選択状態にする（実装は後で）
+                            }}
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* クイックビッド */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Quick Bids:</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+                        {[
+                          { level: 1, suit: 'C', display: '1♣' },
+                          { level: 1, suit: 'D', display: '1♦' },
+                          { level: 1, suit: 'H', display: '1♥' },
+                          { level: 1, suit: 'S', display: '1♠' },
+                          { level: 1, suit: 'NT', display: '1NT' },
+                          { level: 2, suit: 'C', display: '2♣' },
+                          { level: 2, suit: 'D', display: '2♦' },
+                          { level: 2, suit: 'H', display: '2♥' },
+                          { level: 2, suit: 'S', display: '2♠' },
+                          { level: 2, suit: 'NT', display: '2NT' },
+                          { level: 3, suit: 'NT', display: '3NT' },
+                          { level: 7, suit: 'NT', display: '7NT' }
+                        ].map(({ level, suit, display }) => (
+                          <button
+                            key={`${level}${suit}`}
+                            style={{
+                              padding: '4px 8px',
+                              border: '1px solid #2196f3',
+                              borderRadius: '4px',
+                              background: '#fff',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              color: '#2196f3'
+                            }}
+                            onClick={() => handleBid(level, suit)}
+                          >
+                            {display}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* アクションボタン */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        style={{
+                          padding: '8px 16px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          background: '#666',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                        onClick={handlePass}
+                      >
+                        PASS
+                      </button>
+                      
+                      {canDouble() && (
+                        <button
+                          style={{
+                            padding: '8px 16px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            background: '#ff9800',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}
+                          onClick={handleDouble}
+                        >
+                          DOUBLE
+                        </button>
+                      )}
+                      
+                      {canRedouble() && (
+                        <button
+                          style={{
+                            padding: '8px 16px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            background: '#f44336',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}
+                          onClick={handleRedouble}
+                        >
+                          REDOUBLE
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {!isPlayerTurn() && (
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                      Waiting for {gameState.current_bidder}...
+                    </div>
+                    <button
+                      style={{
+                        padding: '8px 16px',
+                        border: 'none',
+                        borderRadius: '4px',
+                        background: '#2196f3',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={makeAIAction}
+                      disabled={loading}
+                    >
+                      {loading ? 'AI Thinking...' : `Execute ${gameState.current_bidder}'s Turn`}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* 手札表示 */}
+              {gameState.players?.South && (
+                <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Your Hand (South)</h4>
+                  <Hand
+                    title=""
+                    cards={gameState.players.South}
+                    size="small"
+                  />
+                </div>
+              )}
+            </div>
           )}
+          
           {gameState.game_phase === 'play' && (
             <div>
-              <h4>Play Controls</h4>
+              <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Play Controls</h4>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Your turn: {isPlayerTurn() ? 'YES' : 'NO'}
+                </div>
+                
+                {!isPlayerTurn() && (
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                      Waiting for {getCurrentPlayer()}...
+                    </div>
+                    <button
+                      style={{
+                        padding: '8px 16px',
+                        border: 'none',
+                        borderRadius: '4px',
+                        background: '#2196f3',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={makeAIAction}
+                      disabled={loading}
+                    >
+                      {loading ? 'AI Thinking...' : `Execute ${getCurrentPlayer()}'s Turn`}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* 手札表示 */}
               {gameState.players?.South && (
-                <Hand
-                  title="Your Hand"
-                  cards={gameState.players.South}
-                  onCardClick={isPlayerTurn() ? handleCardPlay : undefined}
-                  validCards={isPlayerTurn() ? getValidCards() : []}
-                  size="small"
-                />
+                <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Your Hand (South)</h4>
+                  <Hand
+                    title=""
+                    cards={gameState.players.South}
+                    onCardClick={isPlayerTurn() ? handleCardPlay : undefined}
+                    validCards={isPlayerTurn() ? getValidCards() : []}
+                    size="small"
+                  />
+                </div>
               )}
-              {!isPlayerTurn() && (
-                <ActionButton $variant="secondary" onClick={makeAIAction} disabled={loading}>
-                  {loading ? 'AI Thinking...' : `Execute ${getCurrentPlayer()}'s Turn`}
-                </ActionButton>
-              )}
+            </div>
+          )}
+          
+          {gameState.game_phase === 'partnership' && (
+            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Game Setup</h4>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                North-South vs East-West
+              </div>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+                You are playing as South
+              </div>
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#4caf50',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+                onClick={startGame}
+                disabled={loading}
+              >
+                {loading ? 'Starting...' : 'Start Game'}
+              </button>
+            </div>
+          )}
+          
+          {gameState.game_phase === 'deal' && (
+            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Deal Phase</h4>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                Dealer: {gameState.dealer}
+              </div>
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#ff9800',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+                onClick={dealCards}
+                disabled={loading}
+              >
+                {loading ? 'Dealing...' : 'Deal Cards'}
+              </button>
             </div>
           )}
         </Drawer>

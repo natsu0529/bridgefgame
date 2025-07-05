@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { Card } from './Card';
 import { Hand } from './Hand';
-import type { TrickCard, GameState, Card as CardType } from '../types/game';
+import type { TrickCard, GameState } from '../types/game';
 
 interface PlayAreaProps {
   gameState: GameState;
@@ -64,6 +64,18 @@ const CenterArea = styled.div`
   justify-content: center;
   min-height: 180px;
 `;
+
+const ContractInfo = styled.div`
+  background: rgba(255,255,255,0.95);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+`;
+
 const TricksInfo = styled.div`
   margin-top: 10px;
   background: rgba(255,255,255,0.9);
@@ -71,6 +83,8 @@ const TricksInfo = styled.div`
   border-radius: 8px;
   font-weight: bold;
   color: #333;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 `;
 const TrickRow = styled.div`
   display: flex;
@@ -89,7 +103,7 @@ const PlayerName = styled.div`
 export const PlayArea: React.FC<PlayAreaProps> = ({
   gameState
 }) => {
-  const { current_trick, players, dummy, declarer, dummy_revealed, tricks_won } = gameState;
+  const { current_trick, players, dummy, declarer, dummy_revealed, tricks_won, contract, doubled } = gameState;
   // North: dummy, South: you, East/West: opponent
   const northHand = dummy_revealed && dummy ? players[dummy] : [];
   const southHand = players['South'] || [];
@@ -112,6 +126,15 @@ export const PlayArea: React.FC<PlayAreaProps> = ({
           ))}
         </WestArea>
         <CenterArea>
+          {contract && (
+            <ContractInfo>
+              Contract: {contract.level}{contract.suit}
+              {doubled === 1 && ' X'}
+              {doubled === 2 && ' XX'}
+              <br />
+              Declarer: {declarer}
+            </ContractInfo>
+          )}
           <TrickRow>
             {['North', 'East', 'South', 'West'].map(pos => {
               const play = current_trick.find((c: TrickCard) => c.player === pos);
@@ -119,7 +142,10 @@ export const PlayArea: React.FC<PlayAreaProps> = ({
             })}
           </TrickRow>
           <TricksInfo>
-            Tricks: <br />We: {tricks_won?.NS ?? 0} &nbsp; They: {tricks_won?.EW ?? 0}
+            Tricks Won:<br />
+            NS: {tricks_won?.NS ?? 0} &nbsp;&nbsp;&nbsp; EW: {tricks_won?.EW ?? 0}
+            <br />
+            <small>Need: {contract ? contract.level + 6 : 7} tricks</small>
           </TricksInfo>
         </CenterArea>
         <EastArea>
