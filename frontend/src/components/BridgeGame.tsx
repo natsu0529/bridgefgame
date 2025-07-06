@@ -3,67 +3,51 @@ import styled from 'styled-components';
 import { BridgeAPI } from '../services/api';
 import { PlayArea } from './PlayArea';
 import { Hand } from './Hand';
+import { VulnerabilityPanel } from './VulnerabilityPanel';
+import { ContractPanel } from './ContractPanel';
+import { TrickDisplay } from './TrickDisplay';
+import { AuctionHistory } from './AuctionHistory';
+import { ScoreCard } from './ScoreCard';
+import { DummyDisplay } from './DummyDisplay';
+import { BiddingGuide } from './BiddingGuide';
+import { useBidding } from '../hooks/useBidding';
+import { mockGameStates, getPhaseProgression } from '../data/mockData';
 import type { GameState, Card } from '../types/game';
 
 const GameContainer = styled.div`
   height: 100vh;
   width: 100vw;
   margin: 0;
-  padding: 8px;
+  padding: 6px;
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 `;
 
 const Header = styled.header`
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   background: white;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
 `;
 
 const Title = styled.h1`
   color: #2196f3;
-  margin: 0 0 10px 0;
-  font-size: clamp(1.8rem, 4vw, 3rem);
+  margin: 0 0 4px 0;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  line-height: 1.2;
 `;
 
 const Subtitle = styled.p`
   color: #666;
   margin: 0;
-  font-size: clamp(1rem, 2vw, 1.4rem);
-`;
-
-const GameInfo = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(clamp(100px, 12vw, 180px), 1fr));
-  gap: clamp(6px, 1vw, 12px);
-  margin-bottom: clamp(6px, 1vh, 12px);
-  flex-shrink: 0;
-`;
-
-const InfoCard = styled.div`
-  background: white;
-  padding: clamp(6px, 1vw, 12px);
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  text-align: center;
-`;
-
-const InfoLabel = styled.div`
-  font-size: clamp(9px, 1.2vw, 14px);
-  color: #666;
-  margin-bottom: 2px;
-`;
-
-const InfoValue = styled.div`
-  font-size: clamp(12px, 1.8vw, 18px);
-  font-weight: bold;
-  color: #333;
+  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+  line-height: 1.3;
 `;
 
 const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' | 'danger' }>`
@@ -105,26 +89,6 @@ const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' | 'dange
   }
 `;
 
-const GamePhaseIndicator = styled.div<{ $phase: string }>`
-  background: ${({ $phase }) => {
-    switch ($phase) {
-      case 'partnership': return '#9c27b0';
-      case 'deal': return '#ff9800';
-      case 'auction': return '#2196f3';
-      case 'play': return '#4caf50';
-      case 'scoring': return '#f44336';
-      case 'game_over': return '#424242';
-      default: return '#666';
-    }
-  }};
-  color: white;
-  padding: clamp(6px, 1vw, 12px) clamp(12px, 2vw, 20px);
-  border-radius: 20px;
-  font-weight: bold;
-  text-transform: uppercase;
-  font-size: clamp(10px, 1.5vw, 16px);
-`;
-
 const ErrorMessage = styled.div`
   background: #ffebee;
   color: #c62828;
@@ -145,19 +109,29 @@ const LoadingSpinner = styled.div`
 
 const PlayPanel = styled.section`
   background: #388e3c;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+  padding: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
+  min-width: 300px; /* 最小幅を確保 */
+  width: 100%; /* 利用可能な幅を全て使用 */
+  
+  /* グリッドエリアに配置 */
+  grid-area: play;
+  
+  /* モバイルでは最小幅を小さく */
+  @media (max-width: 767px) {
+    min-width: 250px;
+  }
 `;
 
 const DrawerToggle = styled.button`
-  display: none;
   position: absolute;
   top: 10px;
   z-index: 10;
@@ -166,65 +140,146 @@ const DrawerToggle = styled.button`
   border: none;
   border-radius: 6px;
   padding: 6px 14px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   cursor: pointer;
+  transition: all 0.2s ease;
+  display: block;
+  
+  &:hover {
+    background: #1976d2;
+    transform: scale(1.05);
+  }
+  
+  /* スマホ・タブレットでは少し小さく */
   @media (max-width: 767px) {
-    display: block;
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+  
+  /* デスクトップでも表示 */
+  @media (min-width: 768px) {
+    font-size: 12px;
+    padding: 4px 8px;
+    opacity: 0.8;
+    
+    &:hover {
+      opacity: 1;
+    }
   }
 `;
-const ResponsiveLayout = styled.div<{ $displaySize: 'small' | 'medium' | 'large' | 'xlarge' }>`
+const ResponsiveLayout = styled.div<{ 
+  $displaySize: 'small' | 'medium' | 'large' | 'xlarge';
+  $logOpen: boolean;
+  $ctrlOpen: boolean;
+}>`
   display: grid;
   flex: 1;
   gap: clamp(8px, 1vw, 20px);
   position: relative;
   overflow: hidden;
   
-  grid-template-columns: ${({ $displaySize }) => {
-    switch ($displaySize) {
-      case 'small':   // ~19インチ以下 - コンパクト
-        return 'clamp(180px, 15vw, 250px) 1fr clamp(180px, 15vw, 250px)';
-      case 'medium':  // ~24インチ程度 - 標準
-        return 'clamp(200px, 18vw, 300px) 1fr clamp(200px, 18vw, 300px)';
-      case 'large':   // ~29インチ程度 - 大画面
-        return 'clamp(220px, 20vw, 350px) 1fr clamp(220px, 20vw, 350px)';
-      case 'xlarge':  // 30インチ以上 - 超大画面
-        return 'clamp(250px, 22vw, 400px) 1fr clamp(250px, 22vw, 400px)';
-      default:
-        return 'clamp(200px, 18vw, 300px) 1fr clamp(200px, 18vw, 300px)';
+  /* デスクトップ: 動的グリッド（パネル状態に応じて列数を変更） */
+  grid-template-columns: ${({ $displaySize, $logOpen, $ctrlOpen }) => {
+    // パネルの幅を設定
+    const getColumnWidth = () => {
+      switch ($displaySize) {
+        case 'small':   return '200px';
+        case 'medium':  return '220px';
+        case 'large':   return '250px';
+        case 'xlarge':  return '280px';
+        default:        return '220px';
+      }
+    };
+    
+    const columnWidth = getColumnWidth();
+    
+    // 両パネルが閉じている場合：プレイパネルのみ（中央配置）
+    if (!$logOpen && !$ctrlOpen) {
+      return '1fr';
+    }
+    // 左パネルのみ開いている場合
+    else if ($logOpen && !$ctrlOpen) {
+      return `${columnWidth} 1fr`;
+    }
+    // 右パネルのみ開いている場合
+    else if (!$logOpen && $ctrlOpen) {
+      return `1fr ${columnWidth}`;
+    }
+    // 両パネルが開いている場合
+    else {
+      return `${columnWidth} 1fr ${columnWidth}`;
     }
   }};
   
-  /* スマホ・タブレット対応 */
+  /* グリッドエリアで明示的に配置 */
+  grid-template-areas: ${({ $logOpen, $ctrlOpen }) => {
+    if (!$logOpen && !$ctrlOpen) {
+      return '"play"';
+    } else if ($logOpen && !$ctrlOpen) {
+      return '"log play"';
+    } else if (!$logOpen && $ctrlOpen) {
+      return '"play ctrl"';
+    } else {
+      return '"log play ctrl"';
+    }
+  }};
+  
+  /* モバイル・タブレット: 単一列レイアウト */
   @media (max-width: 767px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto;
+    grid-template-areas: "play" !important;
+    gap: 0;
   }
 `;
 
-const Drawer = styled.div<{ open: boolean; side: 'left' | 'right' }>`
+const Drawer = styled.div<{ open: boolean; $side: 'left' | 'right' }>`
+  /* モバイル: 固定位置のオーバーレイ */
   position: fixed;
   top: 0;
-  ${({ side }) => side === 'left' ? 'left: 0;' : 'right: 0;'}
+  ${({ $side }) => $side === 'left' ? 'left: 0;' : 'right: 0;'}
   width: 85vw;
-  max-width: 300px;
+  max-width: 280px;
   height: 100vh;
   background: #fff;
   box-shadow: 0 2px 16px rgba(0,0,0,0.18);
   z-index: 100;
-  transform: translateX(${({ open, side }) => open ? '0' : (side === 'left' ? '-100%' : '100%')});
-  transition: transform 0.3s;
-  padding: 16px;
+  transform: translateX(${({ open, $side }) => open ? '0' : ($side === 'left' ? '-100%' : '100%')});
+  transition: transform 0.3s ease;
+  padding: 12px;
   overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* デスクトップ: グリッドの一部として表示 */
   @media (min-width: 768px) {
     position: static;
     height: 100%;
-    width: 100%;
     max-width: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    border-radius: 8px;
     transform: none;
-    transition: none;
     background: #fff;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1;
+    
+    /* グリッドエリアに配置 */
+    grid-area: ${({ $side }) => $side === 'left' ? 'log' : 'ctrl'};
+    
+    /* 開いている時の設定 */
+    display: ${({ open }) => open ? 'block' : 'none'};
+    width: ${({ open }) => open ? 'auto' : '0'};
+    min-width: ${({ open }) => open ? '200px' : '0'};
+    max-width: ${({ open }) => open ? '300px' : '0'};
+    padding: ${({ open }) => open ? '10px' : '0'};
+    margin: ${({ open }) => open ? '0' : '0'};
+    border: ${({ open }) => open ? '1px solid #e0e0e0' : 'none'};
+    
+    /* アニメーション */
+    transition: all 0.3s ease;
+    opacity: ${({ open }) => open ? '1' : '0'};
+    visibility: ${({ open }) => open ? 'visible' : 'hidden'};
   }
 `;
 
@@ -232,9 +287,11 @@ export const BridgeGame: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 初期状態は画面サイズに応じて後で設定
   const [logOpen, setLogOpen] = useState(false);
   const [ctrlOpen, setCtrlOpen] = useState(false);
   const [displaySize, setDisplaySize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
+  const [useMockData, setUseMockData] = useState(false);
 
   const api = BridgeAPI.getInstance();
 
@@ -264,15 +321,59 @@ export const BridgeGame: React.FC = () => {
     }
   };
 
+  // 初期表示サイズとパネル状態の設定
   useEffect(() => {
-    // 初期化時にディスプレイサイズを検出
     const size = detectDisplaySize();
     setDisplaySize(size);
     
-    // ウィンドウサイズ変更時にも再検出
+    // 初期パネル状態を設定
+    const setInitialPanelState = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const aspectRatio = width / height;
+      
+      console.log('初期パネル状態設定:', { width, height, aspectRatio });
+      
+      // 縦画面（モバイル・タブレット）の場合：両パネル閉じる
+      if (aspectRatio < 1.2) {
+        setLogOpen(false);
+        setCtrlOpen(false);
+      } 
+      // 横画面（デスクトップ）の場合：画面幅に応じて設定
+      else {
+        if (width < 1200) {
+          // 小さい横画面：両パネル閉じる
+          setLogOpen(false);
+          setCtrlOpen(false);
+        } else if (width < 1600) {
+          // 中程度の横画面：ログパネルのみ開く
+          setLogOpen(true);
+          setCtrlOpen(false);
+        } else {
+          // 大きい横画面：両パネル開く
+          setLogOpen(true);
+          setCtrlOpen(true);
+        }
+      }
+    };
+    
+    // 初期化時に実行
+    setInitialPanelState();
+  }, []);
+
+  // ウィンドウサイズ変更時の処理
+  useEffect(() => {
     const handleResize = () => {
       const newSize = detectDisplaySize();
       setDisplaySize(newSize);
+      
+      // リサイズ時はパネル状態を自動調整しない（ユーザーの意図を尊重）
+      console.log('ウィンドウリサイズ:', { 
+        width: window.innerWidth, 
+        height: window.innerHeight, 
+        aspectRatio: window.innerWidth / window.innerHeight,
+        newSize 
+      });
     };
     
     window.addEventListener('resize', handleResize);
@@ -417,6 +518,97 @@ export const BridgeGame: React.FC = () => {
     return players[(lastPlayerIndex + 1) % 4];
   };
 
+  const nextRound = async () => {
+    if (!gameState) return;
+    
+    setLoading(true);
+    try {
+      setError(null);
+      await api.nextRound();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const nextGame = async () => {
+    if (!gameState) return;
+    
+    setLoading(true);
+    try {
+      setError(null);
+      await api.nextGame();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetGame = async () => {
+    setLoading(true);
+    try {
+      setError(null);
+      await api.resetGame();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testAuctionPhase = () => {
+    // テスト用: 手動でオークションフェーズに設定
+    const testGameState: GameState = {
+      game_phase: 'auction',
+      current_round: 1,
+      max_rounds: 4,
+      dealer: 'North',
+      current_bidder: 'North',
+      auction_history: [],
+      contract: null,
+      declarer: null,
+      dummy: null,
+      trump_suit: null,
+      contract_level: 0,
+      doubled: 0,
+      trick_leader: null,
+      current_trick: [],
+      tricks_won: { NS: 0, EW: 0 },
+      dummy_revealed: false,
+      round_scores: [],
+      total_scores: { NS: 0, EW: 0 },
+      vulnerable: { NS: false, EW: false },
+      partnerships: {
+        NS: ['North', 'South'],
+        EW: ['East', 'West']
+      },
+      players: {
+        North: [],
+        South: [],
+        East: [],
+        West: []
+      }
+    };
+    setGameState(testGameState);
+  };
+
+  const loadMockData = (phase: string) => {
+    if (mockGameStates[phase]) {
+      setGameState(mockGameStates[phase]);
+    }
+  };
+
+  const nextPhase = () => {
+    if (gameState && useMockData) {
+      const nextPhase = getPhaseProgression(gameState.game_phase);
+      if (nextPhase !== 'game_over') {
+        loadMockData(nextPhase);
+      }
+    }
+  };
+
   const isPlayerTurn = (): boolean => {
     if (!gameState) return false;
     
@@ -452,6 +644,56 @@ export const BridgeGame: React.FC = () => {
            gameState.doubled === 1;
   };
 
+  // パネル状態リセット関数
+  const resetPanelStates = () => {
+    console.log('パネル状態をリセット');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const aspectRatio = width / height;
+    
+    // 縦画面（モバイル・タブレット）の場合：両パネル閉じる
+    if (aspectRatio < 1.2) {
+      setLogOpen(false);
+      setCtrlOpen(false);
+    } 
+    // 横画面（デスクトップ）の場合：画面幅に応じて設定
+    else {
+      if (width < 1200) {
+        setLogOpen(false);
+        setCtrlOpen(false);
+      } else if (width < 1600) {
+        setLogOpen(true);
+        setCtrlOpen(false);
+      } else {
+        setLogOpen(true);
+        setCtrlOpen(true);
+      }
+    }
+  };
+
+  // 手動パネル切り替え関数
+  const toggleLogPanel = () => {
+    setLogOpen(prev => {
+      console.log('ログパネル切り替え:', prev, '->', !prev);
+      return !prev;
+    });
+  };
+
+  const toggleCtrlPanel = () => {
+    setCtrlOpen(prev => {
+      console.log('操作パネル切り替え:', prev, '->', !prev);
+      return !prev;
+    });
+  };
+
+  const bidding = useBidding({
+    gameState: gameState || {} as GameState,
+    onBidSubmit: handleBid,
+    onPass: handlePass,
+    onDouble: handleDouble,
+    onRedouble: handleRedouble,
+  });
+
   if (!gameState) {
     return (
       <GameContainer>
@@ -459,12 +701,53 @@ export const BridgeGame: React.FC = () => {
           <Title>🃏 Bridge Game</Title>
           <Subtitle>Contract Bridge with AI Players</Subtitle>
         </Header>
+           <ResponsiveLayout $displaySize={displaySize} $logOpen={logOpen} $ctrlOpen={ctrlOpen}>
+        <DrawerToggle style={{left:10}} onClick={()=>setLogOpen(o=>!o)}>
+          {logOpen ? '📋 ✕' : '📋 ≡'}
+        </DrawerToggle>
+        <DrawerToggle style={{right:10}} onClick={()=>setCtrlOpen(o=>!o)}>
+          {ctrlOpen ? '⚙️ ✕' : '⚙️ ≡'}
+        </DrawerToggle>
         
-        <div style={{ textAlign: 'center' }}>
+        {/* ログパネル - 常にレンダリング、open propで制御 */}
+        <Drawer open={logOpen} $side="left">
+          <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
+            Game Status
+          </h3>
+          <div style={{ textAlign: 'center', color: '#666' }}>
+            No game in progress
+          </div>
+        </Drawer>
+        
+        {/* プレイパネル - PlayPanelコンポーネントを使用 */}
+        <PlayPanel>
           <ActionButton $variant="primary" onClick={createNewGame} disabled={loading}>
             {loading ? 'Creating...' : 'Create New Game'}
           </ActionButton>
-        </div>
+        </PlayPanel>
+        
+        {/* コントロールパネル - 常にレンダリング、open propで制御 */}
+        <Drawer open={ctrlOpen} $side="right">
+          <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
+            Controls
+          </h3>
+          
+          <div style={{ background: '#fff3cd', padding: '8px', borderRadius: '4px', marginBottom: '12px', fontSize: '12px' }}>
+            <div><strong>Panel Debug (No Game):</strong></div>
+            <div>Log Panel: {logOpen ? 'OPEN' : 'CLOSED'}</div>
+            <div>Control Panel: {ctrlOpen ? 'OPEN' : 'CLOSED'}</div>
+            <div>Display Size: {displaySize.toUpperCase()}</div>
+            <div>Window Size: {typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'N/A'}</div>
+            <div>Aspect Ratio: {typeof window !== 'undefined' ? (window.innerWidth / window.innerHeight).toFixed(2) : 'N/A'}</div>
+            <div>Device Type: {typeof window !== 'undefined' && window.innerWidth / window.innerHeight < 1.2 ? 'PORTRAIT (Mobile/Tablet)' : 'LANDSCAPE (Desktop)'}</div>
+            <div>GameState: NULL</div>
+          </div>
+          
+          <div style={{ textAlign: 'center', color: '#666' }}>
+            Start a game to see controls
+          </div>
+        </Drawer>
+      </ResponsiveLayout>
         
         {error && <ErrorMessage>{error}</ErrorMessage>}
       </GameContainer>
@@ -478,164 +761,127 @@ export const BridgeGame: React.FC = () => {
         <Subtitle>Contract Bridge with AI Players</Subtitle>
       </Header>
       {error && <ErrorMessage>{error}</ErrorMessage>}
-      <GameInfo>
-        <InfoCard>
-          <InfoLabel>Game Phase</InfoLabel>
-          <InfoValue>
-            <GamePhaseIndicator $phase={gameState.game_phase}>
-              {(gameState.game_phase || '').replace('_', ' ')}
-            </GamePhaseIndicator>
-          </InfoValue>
-        </InfoCard>
-        
-        <InfoCard>
-          <InfoLabel>Round</InfoLabel>
-          <InfoValue>{gameState.current_round} / {gameState.max_rounds}</InfoValue>
-        </InfoCard>
-        
-        <InfoCard>
-          <InfoLabel>NS Score</InfoLabel>
-          <InfoValue>{gameState.total_scores?.NS ?? 0}</InfoValue>
-        </InfoCard>
-        
-        <InfoCard>
-          <InfoLabel>EW Score</InfoLabel>
-          <InfoValue>{gameState.total_scores?.EW ?? 0}</InfoValue>
-        </InfoCard>
-        
-        {gameState.dealer && (
-          <InfoCard>
-            <InfoLabel>Dealer</InfoLabel>
-            <InfoValue>{gameState.dealer}</InfoValue>
-          </InfoCard>
-        )}
-      </GameInfo>
-      <ResponsiveLayout $displaySize={displaySize}>
+      <ResponsiveLayout $displaySize={displaySize} $logOpen={logOpen} $ctrlOpen={ctrlOpen}>
         <DrawerToggle style={{left:10}} onClick={()=>setLogOpen(o=>!o)}>
-          {logOpen ? '← Log' : '→ Log'}
+          {logOpen ? '📋 ✕' : '📋 ≡'}
         </DrawerToggle>
         <DrawerToggle style={{right:10}} onClick={()=>setCtrlOpen(o=>!o)}>
-          {ctrlOpen ? 'Controls →' : '← Controls'}
+          {ctrlOpen ? '⚙️ ✕' : '⚙️ ≡'}
         </DrawerToggle>
         
-        {/* 左側ログパネル */}
-        <Drawer open={logOpen} side="left">
+        {/* 左側ログパネル - 常にレンダリング、open propで制御 */}
+        <Drawer open={logOpen} $side="left">
           <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
-            Game Log
+            Game Status
           </h3>
           
-          {/* ラウンド進行 */}
+          {/* ゲーム基本情報 */}
           <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Round Progress</h4>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2196f3' }}>
-              {gameState.current_round} / {gameState.max_rounds}
-            </div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              {gameState.max_rounds - gameState.current_round} rounds remaining
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Game Info</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '12px' }}>
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#2196f3' }}>Phase:</span>
+                <div style={{ color: '#333' }}>{(gameState.game_phase || '').replace('_', ' ').toUpperCase()}</div>
+              </div>
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#2196f3' }}>Round:</span>
+                <div style={{ color: '#333' }}>{gameState.current_round} / {gameState.max_rounds}</div>
+              </div>
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#2196f3' }}>NS Score:</span>
+                <div style={{ color: '#333' }}>{gameState.total_scores?.NS ?? 0}</div>
+              </div>
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#2196f3' }}>EW Score:</span>
+                <div style={{ color: '#333' }}>{gameState.total_scores?.EW ?? 0}</div>
+              </div>
+              {gameState.dealer && (
+                <div>
+                  <span style={{ fontWeight: 'bold', color: '#2196f3' }}>Dealer:</span>
+                  <div style={{ color: '#333' }}>{gameState.dealer}</div>
+                </div>
+              )}
+              {gameState.game_phase === 'auction' && (
+                <div>
+                  <span style={{ fontWeight: 'bold', color: '#2196f3' }}>Current Bidder:</span>
+                  <div style={{ color: '#333' }}>{gameState.current_bidder}</div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* チーム総合点 */}
-          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Team Scores</h4>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4caf50' }}>
-                  NS: {gameState.total_scores?.NS ?? 0}
-                </div>
-                <div style={{ fontSize: '10px', color: '#666' }}>North-South</div>
-              </div>
-              <div style={{ fontSize: '20px', color: '#ccc' }}>vs</div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#f44336' }}>
-                  EW: {gameState.total_scores?.EW ?? 0}
-                </div>
-                <div style={{ fontSize: '10px', color: '#666' }}>East-West</div>
-              </div>
-            </div>
-          </div>
-
-          {/* 現在のトリック数 */}
-          {gameState.game_phase === 'play' && (
-            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Current Hand</h4>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>NS Tricks: {gameState.tricks_won?.NS ?? 0}</div>
-                  <div style={{ fontWeight: 'bold' }}>EW Tricks: {gameState.tricks_won?.EW ?? 0}</div>
-                </div>
-                <div>
-                  <div style={{ color: '#666' }}>Total: {(gameState.tricks_won?.NS ?? 0) + (gameState.tricks_won?.EW ?? 0)}/13</div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* バルネラビリティ */}
+          <VulnerabilityPanel
+            vulnerable={gameState?.vulnerable}
+            dealer={gameState?.dealer || null}
+          />
 
           {/* 現在のコントラクト */}
           {gameState.contract && (
-            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Contract</h4>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2196f3' }}>
-                {gameState.contract.level}{gameState.contract.suit}
-                {gameState.doubled === 1 && ' X'}
-                {gameState.doubled === 2 && ' XX'}
-              </div>
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                Declarer: {gameState.declarer}
-              </div>
-            </div>
-          )}
-          
-          {/* オークション履歴 */}
-          {gameState.auction_history && gameState.auction_history.length > 0 && (
-            <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-              <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Recent Auction</h4>
-              <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '12px' }}>
-                {gameState.auction_history.slice(-8).map((bid, i) => (
-                  <div key={i} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    padding: '2px 0',
-                    borderBottom: i < gameState.auction_history.slice(-8).length - 1 ? '1px solid #eee' : 'none'
-                  }}>
-                    <span style={{ fontWeight: 'bold', color: '#2196f3' }}>{bid.player}:</span>
-                    <span style={{ color: bid.type === 'bid' ? '#4caf50' : '#666' }}>
-                      {bid.type === 'bid' ? `${bid.level}${bid.suit}` : bid.type.toUpperCase()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ContractPanel
+              contract={gameState.contract}
+              declarer={gameState.declarer || null}
+              doubled={gameState.doubled}
+            />
           )}
 
-          {/* 現在のフェーズ情報 */}
-          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px' }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Current Phase</h4>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#2196f3', marginBottom: '4px' }}>
-              {(gameState.game_phase || '').replace('_', ' ').toUpperCase()}
-            </div>
-            {gameState.game_phase === 'auction' && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                Current bidder: {gameState.current_bidder}
-              </div>
-            )}
-            {gameState.game_phase === 'play' && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                Current player: {getCurrentPlayer()}
-              </div>
-            )}
-            {gameState.dealer && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                Dealer: {gameState.dealer}
-              </div>
-            )}
-          </div>
+          {/* スコアカード */}
+          <ScoreCard
+            roundScores={gameState.round_scores || []}
+            totalScores={gameState.total_scores || { NS: 0, EW: 0 }}
+            vulnerable={gameState.vulnerable || { NS: false, EW: false }}
+          />
+
+          {/* 現在のトリック */}
+          {gameState.game_phase === 'play' && (
+            <TrickDisplay
+              currentTrick={gameState.current_trick || []}
+              trickNumber={gameState.tricks_won ? 
+                (gameState.tricks_won.NS || 0) + (gameState.tricks_won.EW || 0) + 1 : 1}
+              trumpSuit={gameState.trump_suit || null}
+            />
+          )}
+
+          {/* オークション履歴 */}
+          <AuctionHistory
+            auctionHistory={gameState.auction_history || []}
+            currentBidder={gameState.current_bidder || null}
+          />
         </Drawer>
         
         {/* 中央プレイパネル */}
         <PlayPanel>
+          {/* オークション表示 */}
+          {gameState.game_phase === 'auction' && (
+            <div style={{ color: 'white', textAlign: 'center', padding: '20px' }}>
+              <h2>Auction Phase</h2>
+              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                <AuctionHistory
+                  auctionHistory={gameState?.auction_history}
+                  currentBidder={gameState?.current_bidder || null}
+                  contract={gameState?.contract}
+                />
+              </div>
+              {gameState.current_bidder && (
+                <p>Current bidder: {gameState.current_bidder}</p>
+              )}
+            </div>
+          )}
+
+          {/* プレイ表示 */}
           {gameState.game_phase === 'play' && (
-            <PlayArea gameState={gameState} />
+            <div>
+              <PlayArea gameState={gameState} />
+              
+              {/* トリック表示を中央に追加 */}
+              <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
+                <TrickDisplay
+                  currentTrick={gameState?.current_trick}
+                  trickNumber={Math.floor(((gameState?.tricks_won?.NS || 0) + (gameState?.tricks_won?.EW || 0)) / 4) + 1}
+                  trumpSuit={gameState?.trump_suit}
+                />
+              </div>
+            </div>
           )}
           {gameState.game_phase === 'partnership' && (
             <div style={{ color: 'white', textAlign: 'center' }}>
@@ -656,9 +902,109 @@ export const BridgeGame: React.FC = () => {
             </div>
           )}
           {gameState.game_phase === 'auction' && (
-            <div style={{ color: 'white', textAlign: 'center' }}>
+            <div style={{ color: 'white', textAlign: 'center', width: '100%' }}>
               <h2>Auction Phase</h2>
               <p>Current bidder: {gameState.current_bidder}</p>
+              
+              {/* オークション用UIをプレイパネルに追加 */}
+              {isPlayerTurn() && (
+                <div style={{ background: 'rgba(255,255,255,0.95)', color: '#333', padding: '16px', borderRadius: '12px', margin: '16px auto', maxWidth: '400px' }}>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#2196f3' }}>Your Turn to Bid</h3>
+                  
+                  {/* クイックビッド */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#666' }}>Quick Bids:</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                      {[
+                        { level: 1, suit: 'C', display: '1♣' },
+                        { level: 1, suit: 'D', display: '1♦' },
+                        { level: 1, suit: 'H', display: '1♥' },
+                        { level: 1, suit: 'S', display: '1♠' },
+                        { level: 1, suit: 'NT', display: '1NT' },
+                        { level: 2, suit: 'C', display: '2♣' },
+                        { level: 2, suit: 'NT', display: '2NT' },
+                        { level: 3, suit: 'NT', display: '3NT' }
+                      ].map(({ level, suit, display }) => (
+                        <button
+                          key={`${level}${suit}`}
+                          style={{
+                            padding: '8px 4px',
+                            border: '2px solid #2196f3',
+                            borderRadius: '6px',
+                            background: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: '#2196f3',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = '#e3f2fd'}
+                          onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = '#fff'}
+                          onClick={() => handleBid(level, suit)}
+                        >
+                          {display}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* アクションボタン */}
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      style={{
+                        padding: '10px 20px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: '#666',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={handlePass}
+                    >
+                      PASS
+                    </button>
+                    
+                    {canDouble() && (
+                      <button
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          borderRadius: '6px',
+                          background: '#ff9800',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold'
+                        }}
+                        onClick={handleDouble}
+                      >
+                        DOUBLE
+                      </button>
+                    )}
+                    
+                    {canRedouble() && (
+                      <button
+                        style={{
+                          padding: '10px 20px',
+                          border: 'none',
+                          borderRadius: '6px',
+                          background: '#f44336',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold'
+                        }}
+                        onClick={handleRedouble}
+                      >
+                        REDOUBLE
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {gameState.players?.South && (
                 <Hand
                   title="Your Hand (South)"
@@ -675,201 +1021,332 @@ export const BridgeGame: React.FC = () => {
           )}
         </PlayPanel>
         
-        {/* 右側操作パネル */}
-        <Drawer open={ctrlOpen} side="right">
-          <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
-            Controls
-          </h3>
+        {/* 右側操作パネル - 開いている時のみレンダリング */}
+        {ctrlOpen && (
+          <Drawer open={ctrlOpen} $side="right">
+            <h3 style={{ margin: '0 0 16px 0', color: '#2196f3', borderBottom: '2px solid #e0e0e0', paddingBottom: '8px' }}>
+              Controls
+            </h3>
+            
+            {/* ...existing code... */}
+            
+            {/* パネル表示確認用 */}
+            <div style={{ background: '#fff3cd', padding: '8px', borderRadius: '4px', marginBottom: '12px', fontSize: '12px' }}>
+              <div><strong>Panel Debug:</strong></div>
+              <div>Log Panel: {logOpen ? 'OPEN' : 'CLOSED'}</div>
+              <div>Control Panel: {ctrlOpen ? 'OPEN' : 'CLOSED'}</div>
+              <div>Display Size: {displaySize.toUpperCase()}</div>
+              <div>Window Size: {typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'N/A'}</div>
+              <div>Aspect Ratio: {typeof window !== 'undefined' ? (window.innerWidth / window.innerHeight).toFixed(2) : 'N/A'}</div>
+              <div>Device Type: {typeof window !== 'undefined' && window.innerWidth / window.innerHeight < 1.2 ? 'PORTRAIT (Mobile/Tablet)' : 'LANDSCAPE (Desktop)'}</div>
+              <div>GameState exists: {gameState ? 'YES' : 'NO'}</div>
+              <div>Game Phase: "{gameState?.game_phase || 'undefined'}"</div>
+              <div>Auction condition: {gameState?.game_phase === 'auction' ? 'TRUE' : 'FALSE'}</div>
+              {gameState && (
+                <>
+                  <div><strong>Full GameState:</strong></div>
+                  <div>Current Round: {gameState.current_round}</div>
+                  <div>Current Bidder: {gameState.current_bidder || 'none'}</div>
+                  <div>Dealer: {gameState.dealer || 'none'}</div>
+                  <div>All fields: {JSON.stringify(Object.keys(gameState))}</div>
+                </>
+              )}
+            </div>
+          
+          {/* ゲーム進行ボタン */}
+          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Game Control</h4>
+            
+            {gameState?.game_phase === 'partnership' && (
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#4caf50',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  marginBottom: '8px'
+                }}
+                onClick={startGame}
+                disabled={loading}
+              >
+                {loading ? 'Starting...' : 'Start Game'}
+              </button>
+            )}
+            
+            {gameState?.game_phase === 'deal' && (
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#ff9800',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  marginBottom: '8px'
+                }}
+                onClick={dealCards}
+                disabled={loading}
+              >
+                {loading ? 'Dealing...' : 'Deal Cards'}
+              </button>
+            )}
+            
+            {/* Test button for auction phase */}
+            <button
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                borderRadius: '4px',
+                background: '#9c27b0',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                width: '100%',
+                marginBottom: '8px'
+              }}
+              onClick={testAuctionPhase}
+            >
+              Test Auction Phase
+            </button>
+            
+            {/* Mock Data Controls */}
+            <div style={{ background: '#e8f5e8', padding: '8px', borderRadius: '4px', marginBottom: '8px' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#2e7d32', fontSize: '12px' }}>Mock Mode</h4>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                <button
+                  style={{
+                    padding: '4px 8px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    background: useMockData ? '#4caf50' : '#ccc',
+                    color: useMockData ? '#fff' : '#666',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    flex: 1
+                  }}
+                  onClick={() => setUseMockData(!useMockData)}
+                >
+                  {useMockData ? 'Mock ON' : 'Mock OFF'}
+                </button>
+              </div>
+              {useMockData && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      background: '#4caf50',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      width: '100%'
+                    }}
+                    onClick={() => loadMockData('partnership')}
+                  >
+                    Partnership Phase
+                  </button>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      background: '#ff9800',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      width: '100%'
+                    }}
+                    onClick={() => loadMockData('deal')}
+                  >
+                    Deal Phase
+                  </button>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      background: '#2196f3',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      width: '100%'
+                    }}
+                    onClick={() => loadMockData('auction')}
+                  >
+                    Auction Phase
+                  </button>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      background: '#673ab7',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      width: '100%'
+                    }}
+                    onClick={nextPhase}
+                  >
+                    Next Phase
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* ダミー表示 */}
+          {gameState?.game_phase === 'play' && (
+            <DummyDisplay
+              dummy={gameState?.dummy || null}
+              dummyCards={gameState?.dummy ? gameState?.players?.[gameState.dummy] : []}
+              dummyRevealed={gameState?.dummy_revealed}
+              onCardClick={gameState?.dummy === 'South' ? handleCardPlay : undefined}
+              validCards={gameState?.dummy === 'South' ? getValidCards() : []}
+            />
+          )}
           
           {gameState.game_phase === 'auction' && (
             <div>
-              <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Auction Controls</h4>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                  Your turn: {isPlayerTurn() ? 'YES' : 'NO'}
+              {/* デバッグ情報 */}
+              <div style={{ background: '#e3f2fd', padding: '8px', borderRadius: '4px', marginBottom: '12px', fontSize: '12px' }}>
+                <div><strong>Debug Info:</strong></div>
+                <div>Game Phase: {gameState.game_phase}</div>
+                <div>Current Bidder: {gameState.current_bidder}</div>
+                <div>Is Player Turn: {bidding.isPlayerTurn() ? 'YES' : 'NO'}</div>
+                <div>Loading: {bidding.loading ? 'YES' : 'NO'}</div>
+                <div>Current Bid: {bidding.currentBid ? 
+                  `${bidding.currentBid.level}${bidding.currentBid.suit} by ${bidding.currentBid.player}` : 
+                  'None'}
                 </div>
-                
-                {isPlayerTurn() && (
-                  <div>
-                    {/* レベル選択 */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Level:</div>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {[1, 2, 3, 4, 5, 6, 7].map(level => (
-                          <button
-                            key={level}
-                            style={{
-                              padding: '6px 12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              background: '#fff',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 'bold',
-                              color: '#333'
-                            }}
-                            onClick={() => {
-                              // レベルを選択状態にする（実装は後で）
-                            }}
-                          >
-                            {level}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* スート選択 */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Suit:</div>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {[
-                          { suit: 'C', symbol: '♣', color: '#000' },
-                          { suit: 'D', symbol: '♦', color: '#d32f2f' },
-                          { suit: 'H', symbol: '♥', color: '#d32f2f' },
-                          { suit: 'S', symbol: '♠', color: '#000' },
-                          { suit: 'NT', symbol: 'NT', color: '#2196f3' }
-                        ].map(({ suit, symbol, color }) => (
-                          <button
-                            key={suit}
-                            style={{
-                              padding: '6px 12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              background: '#fff',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 'bold',
-                              color: color
-                            }}
-                            onClick={() => {
-                              // スートを選択状態にする（実装は後で）
-                            }}
-                          >
-                            {symbol}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* クイックビッド */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Quick Bids:</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
-                        {[
-                          { level: 1, suit: 'C', display: '1♣' },
-                          { level: 1, suit: 'D', display: '1♦' },
-                          { level: 1, suit: 'H', display: '1♥' },
-                          { level: 1, suit: 'S', display: '1♠' },
-                          { level: 1, suit: 'NT', display: '1NT' },
-                          { level: 2, suit: 'C', display: '2♣' },
-                          { level: 2, suit: 'D', display: '2♦' },
-                          { level: 2, suit: 'H', display: '2♥' },
-                          { level: 2, suit: 'S', display: '2♠' },
-                          { level: 2, suit: 'NT', display: '2NT' },
-                          { level: 3, suit: 'NT', display: '3NT' },
-                          { level: 7, suit: 'NT', display: '7NT' }
-                        ].map(({ level, suit, display }) => (
-                          <button
-                            key={`${level}${suit}`}
-                            style={{
-                              padding: '4px 8px',
-                              border: '1px solid #2196f3',
-                              borderRadius: '4px',
-                              background: '#fff',
-                              cursor: 'pointer',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              color: '#2196f3'
-                            }}
-                            onClick={() => handleBid(level, suit)}
-                          >
-                            {display}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* アクションボタン */}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <button
-                        style={{
-                          padding: '8px 16px',
-                          border: 'none',
-                          borderRadius: '4px',
-                          background: '#666',
-                          color: '#fff',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
-                        }}
-                        onClick={handlePass}
-                      >
-                        PASS
-                      </button>
-                      
-                      {canDouble() && (
-                        <button
-                          style={{
-                            padding: '8px 16px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            background: '#ff9800',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}
-                          onClick={handleDouble}
-                        >
-                          DOUBLE
-                        </button>
-                      )}
-                      
-                      {canRedouble() && (
-                        <button
-                          style={{
-                            padding: '8px 16px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            background: '#f44336',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}
-                          onClick={handleRedouble}
-                        >
-                          REDOUBLE
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {!isPlayerTurn() && (
-                  <div>
-                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                      Waiting for {gameState.current_bidder}...
-                    </div>
-                    <button
-                      style={{
-                        padding: '8px 16px',
-                        border: 'none',
-                        borderRadius: '4px',
-                        background: '#2196f3',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}
-                      onClick={makeAIAction}
-                      disabled={loading}
-                    >
-                      {loading ? 'AI Thinking...' : `Execute ${gameState.current_bidder}'s Turn`}
-                    </button>
-                  </div>
-                )}
+                <div>Device: {displaySize}, W: {window.innerWidth}, H: {window.innerHeight}</div>
+                <div>Aspect Ratio: {(window.innerWidth / window.innerHeight).toFixed(2)}</div>
+                <div>Log Panel: {logOpen ? 'OPEN' : 'CLOSED'}, Ctrl Panel: {ctrlOpen ? 'OPEN' : 'CLOSED'}</div>
+                <div style={{ marginTop: '8px' }}>
+                  <button onClick={resetPanelStates} style={{ padding: '4px 8px', margin: '2px', fontSize: '10px' }}>
+                    Reset Panel States
+                  </button>
+                  <button onClick={toggleLogPanel} style={{ padding: '4px 8px', margin: '2px', fontSize: '10px' }}>
+                    Toggle Log
+                  </button>
+                  <button onClick={toggleCtrlPanel} style={{ padding: '4px 8px', margin: '2px', fontSize: '10px' }}>
+                    Toggle Ctrl
+                  </button>
+                </div>
               </div>
+              
+              {/* 簡単なテスト用UI */}
+              <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Simple Auction Test</h4>
+                <button 
+                  style={{ 
+                    padding: '8px 16px', 
+                    margin: '4px', 
+                    background: '#2196f3', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px' 
+                  }}
+                  onClick={() => bidding.handlePass()}
+                >
+                  PASS
+                </button>
+                <button 
+                  style={{ 
+                    padding: '8px 16px', 
+                    margin: '4px', 
+                    background: '#4caf50', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px' 
+                  }}
+                  onClick={() => bidding.handleBid(1, 'C')}
+                >
+                  1♣
+                </button>
+              </div>
+              
+              <BiddingGuide
+                gameState={gameState}
+                currentBid={bidding.currentBid}
+                isPlayerTurn={bidding.isPlayerTurn()}
+                onBid={bidding.handleBid}
+                onPass={bidding.handlePass}
+                onDouble={bidding.handleDouble}
+                onRedouble={bidding.handleRedouble}
+                onNextRound={nextRound}
+                canDouble={bidding.canDouble}
+                canRedouble={bidding.canRedouble}
+                loading={bidding.loading}
+              />
+              
+              {/* エラー表示 */}
+              {bidding.error && (
+                <div style={{ 
+                  background: '#ffebee', 
+                  color: '#c62828', 
+                  padding: '8px 12px', 
+                  borderRadius: '4px', 
+                  marginBottom: '12px', 
+                  fontSize: '12px' 
+                }}>
+                  {bidding.error}
+                  <button
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#c62828',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      float: 'right'
+                    }}
+                    onClick={bidding.clearError}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              
+              {/* AIアクション */}
+              {!bidding.isPlayerTurn() && (
+                <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                    Waiting for {gameState.current_bidder}...
+                  </div>
+                  <button
+                    style={{
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      background: '#2196f3',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      width: '100%'
+                    }}
+                    onClick={makeAIAction}
+                    disabled={loading}
+                  >
+                    {loading ? 'AI Thinking...' : `Execute ${gameState.current_bidder}'s Turn`}
+                  </button>
+                </div>
+              )}
               
               {/* 手札表示 */}
               {gameState.players?.South && (
@@ -986,7 +1463,76 @@ export const BridgeGame: React.FC = () => {
               </button>
             </div>
           )}
+          
+          {/* ゲーム進行管理 */}
+          <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>Game Progress</h4>
+            
+            {/* ラウンド情報 */}
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+              Round: {gameState?.current_round || 1}
+            </div>
+            
+            {/* 進行ボタン */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {gameState?.game_phase === 'scoring' && (
+                <button
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    background: '#4caf50',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                  onClick={nextRound}
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : 'Next Round'}
+                </button>
+              )}
+              
+              {gameState?.game_phase === 'game_over' && (
+                <button
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    background: '#2196f3',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                  onClick={nextGame}
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : 'Next Game'}
+                </button>
+              )}
+              
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#f44336',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+                onClick={resetGame}
+                disabled={loading}
+              >
+                {loading ? 'Resetting...' : 'Reset Game'}
+              </button>
+            </div>
+          </div>
         </Drawer>
+        )}
       </ResponsiveLayout>
       {loading && (
         <LoadingSpinner>

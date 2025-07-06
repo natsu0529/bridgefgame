@@ -120,6 +120,32 @@ export class BridgeAPI {
     }
   }
 
+  async nextGame(): Promise<void> {
+    if (!this.gameId) {
+      throw new Error('No active game');
+    }
+    
+    try {
+      await axios.post(`${API_BASE_URL}/games/${this.gameId}/next_game`);
+    } catch (error) {
+      console.error('Failed to start next game:', error);
+      throw error;
+    }
+  }
+
+  async resetGame(): Promise<void> {
+    if (!this.gameId) {
+      throw new Error('No active game');
+    }
+    
+    try {
+      await axios.post(`${API_BASE_URL}/games/${this.gameId}/reset`);
+    } catch (error) {
+      console.error('Failed to reset game:', error);
+      throw error;
+    }
+  }
+
   async deleteGame(): Promise<void> {
     if (!this.gameId) {
       return;
